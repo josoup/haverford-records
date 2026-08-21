@@ -25,6 +25,7 @@ import gzip
 import json
 import re
 import sys
+import hashlib
 import time
 import urllib.error
 import urllib.request
@@ -43,10 +44,11 @@ SPORTS = [
     "mens-basketball", "mens-cross-country", "mens-fencing",
     "mens-indoor-track", "mens-lacrosse", "mens-soccer", "mens-squash",
     "mens-tennis", "mens-track-and-field",
+    # women's tennis 404s on the modern slug; recon saw the legacy "wten"
     "softball",
     "womens-basketball", "womens-cross-country", "womens-fencing",
     "womens-indoor-track", "womens-lacrosse", "womens-soccer",
-    "womens-squash", "womens-tennis", "womens-track-and-field",
+    "womens-squash", "wten", "womens-track-and-field",
     "womens-volleyball",
 ]
 
@@ -108,11 +110,22 @@ def main() -> int:
         summary["current"][slug] = {"status": st, "bytes": len(body), "player_refs": hits}
 
     print(f"\n=== archive depth: {ARCHIVE_PROBE_SPORT} ===")
-    found = []
+    # Fingerprint the current roster first. Any "archived" year whose body
+    # hashes the same is the site falling back, not a real season.
+    cur = args.out / f"roster-{ARCHIVE_PROBE_SPORT}-current.html"
+    current_hash = (
+        hashlib.sha256(cur.read_bytes()).hexdigest() if cur.exists() else None
+    )
+    found, fallbacks = [], []
     for year in range(2026, args.earliest - 1, -1):
         url = f"{BASE}/sports/{ARCHIVE_PROBE_SPORT}/roster/{year}"
         st, body = fetch(url, args.delay, last)
         ok, hits = looks_like_roster(body)
+        digest = hashlib.sha256(body.encode()).hexdigest() if body else ""
+        if st == 200 and ok and digest == current_hash:
+            fallbacks.append(year)
+            print(f"  ==  {year}  identical to current roster -- NOT an archive")
+            continue
         if st == 200 and ok:
             found.append(year)
             # Keep a spread of seasons, not all of them.
@@ -122,9 +135,12 @@ def main() -> int:
             print(f"  OK  {year}  ~{hits} player refs")
         else:
             print(f"  --  {year}  status {st}")
-    summary["archive"][ARCHIVE_PROBE_SPORT] = found
+    summary["archive"][ARCHIVE_PROBE_SPORT] = {"real": found, "fallbacks": fallbacks}
+    if fallbacks:
+        print(f"\n  {len(fallbacks)} year(s) served the current roster verbatim: "
+              f"{min(fallbacks)}-{max(fallbacks)}")
     if found:
-        print(f"\n  archive floor: {min(found)}  ({len(found)} seasons available)")
+        print(f"\n  real archive floor: {min(found)}  ({len(found)} genuine seasons)")
     else:
         print("\n  !! no archived seasons found -- the year URL pattern may differ")
 
