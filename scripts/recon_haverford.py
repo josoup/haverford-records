@@ -271,7 +271,10 @@ def main() -> int:
 
     # ---- 4. how far back do archives go? -------------------------------
     print("\n=== 4. Archive depth probe ===")
-    probe_code = sorted(codes)[0] if codes else None
+    # Sidearm mixes dated article paths (/sports/2025/5/16/...) in with real
+    # sport slugs. Numeric segments are never sports.
+    real = [c for c in sorted(codes) if not c.isdigit()]
+    probe_code = real[0] if real else None
     if not probe_code:
         for guess in GUESS_SPORT_CODES:
             st, _ = f.get(f"{BASE}/sports/{guess}", save=False)
@@ -287,8 +290,8 @@ def main() -> int:
         print(f"  probing sport {probe_code!r} backwards from 2026 to {args.earliest}")
         # Both common shapes; whichever returns 200s is the site's convention.
         templates = [
-            f"{BASE}/sports/{probe_code}/{{y}}-{{yy}}/roster",   # PrestoSports
             f"{BASE}/sports/{probe_code}/roster/{{y}}",          # Sidearm
+            f"{BASE}/sports/{probe_code}/{{y}}-{{yy}}/roster",   # PrestoSports
         ]
         found: dict[str, list[int]] = {t: [] for t in templates}
         for year in range(2026, args.earliest - 1, -1):

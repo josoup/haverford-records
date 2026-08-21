@@ -125,3 +125,16 @@ resolves against; it is not yet the records dataset.
   agreement with these providers.
 - This repository is private. Rosters contain student names, hometowns and
   class years.
+
+## Recon findings (2026-08-21)
+
+- **Platform: Sidearm Sports.** Roster URLs are `/sports/<slug>/roster`, with
+  archived seasons at `/sports/<slug>/roster/<year>`.
+- **23 varsity sports**, slugs recorded in `scripts/fetch_roster_fixtures.py`.
+- **No sitemap.xml, no reachable JSON API.** `/api` and `/api/v2` 404;
+  `/services/` is `Disallow`ed for `*` in robots.txt so it is off-limits
+  regardless. The homepage does embed JSON-LD, worth a look. This means HTML
+  parsing, not a JSON feed.
+- **robots.txt allows `/sports/`** for `*` and asks `Crawl-delay: 30`.
+  Disallowed and avoided: `/common/`, `/images/`, `/documents/`, `/admin/`,
+  `/services/`, `/site/`, `/hidden/`, and `*print=true*`.
