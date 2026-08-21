@@ -10,3 +10,7 @@ data/raw/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+
+dashboard/node_modules/
+dashboard/dist/
+dashboard/shot*.mjs
