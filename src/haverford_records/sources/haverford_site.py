@@ -43,6 +43,7 @@ class RosterRow:
     highschool: str | None = None
     previous_school: str | None = None
     bio_url: str | None = None
+    headshot_url: str | None = None
 
 
 @dataclass
@@ -61,6 +62,16 @@ def _text(node: Node | None) -> str | None:
 
 def _first(node: Node, selector: str) -> str | None:
     return _text(node.css_first(selector))
+
+
+def _headshot(li: Node) -> str | None:
+    """Sidearm lazy-loads headshots, so the real src is in data-src."""
+    img = li.css_first(".sidearm-roster-player-image img, img.lazyload")
+    if img is None:
+        return None
+    src = img.attributes.get("data-src") or img.attributes.get("src")
+    # Strip the thumbnail sizing query so the detail view can request its own.
+    return src.split("?")[0] if src else None
 
 
 def parse_roster(html: str, *, expect_min: int = 5) -> RosterPage:
@@ -115,6 +126,7 @@ def parse_roster(html: str, *, expect_min: int = 5) -> RosterPage:
                 highschool=_first(li, ".sidearm-roster-player-highschool"),
                 previous_school=_first(li, ".sidearm-roster-player-previous-school"),
                 bio_url=href,
+                headshot_url=_headshot(li),
             )
         )
 

@@ -62,3 +62,12 @@ def test_archived_season_is_not_the_current_squad():
 def test_broken_layout_raises_rather_than_returning_nothing():
     with pytest.raises(RosterParseError):
         parse_roster("<html><body><p>nothing here</p></body></html>")
+
+
+def test_headshots_are_extracted_and_distinct():
+    """Sidearm lazy-loads images; the real URL is in data-src, not src."""
+    rows = parse_roster(fixture("roster-mens-soccer-current")).rows
+    shots = [r.headshot_url for r in rows if r.headshot_url]
+    assert len(shots) == len(rows)
+    assert len(set(shots)) == len(rows), "each athlete should have their own image"
+    assert all(s.startswith("/images/") and "?" not in s for s in shots)

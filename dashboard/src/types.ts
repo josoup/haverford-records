@@ -12,6 +12,7 @@ export interface AthleteSeason {
   state: string | null;
   highSchool: string | null;
   bioUrl: string | null;
+  headshotUrl: string | null;
 }
 
 export interface AthleteData {

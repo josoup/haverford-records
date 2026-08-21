@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import AthleteDetail from "./AthleteDetail";
 import raw from "./data/athletes.json";
 import type { AthleteData, AthleteSeason } from "./types";
 
@@ -36,11 +37,22 @@ function Bars({ rows }: { rows: [string, number][] }) {
 }
 
 export default function App() {
+  const [selected, setSelected] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [sport, setSport] = useState("all");
   const [season, setSeason] = useState("all");
   const [sort, setSort] = useState<SortKey>("name");
   const [asc, setAsc] = useState(true);
+
+  const byAthlete = useMemo(() => {
+    const m = new Map<string, AthleteSeason[]>();
+    for (const a of data.athleteSeasons) {
+      const list = m.get(a.id) ?? [];
+      list.push(a);
+      m.set(a.id, list);
+    }
+    return m;
+  }, []);
 
   const sports = useMemo(
     () => [...new Set(data.athleteSeasons.map((a) => a.sport))].sort(),
@@ -113,6 +125,13 @@ export default function App() {
       </header>
 
       <div className="wrap">
+        {selected && byAthlete.has(selected) ? (
+          <AthleteDetail
+            seasons={byAthlete.get(selected)!}
+            onBack={() => setSelected(null)}
+          />
+        ) : (
+        <>
         <section>
           <div className="section-head">
             <h2>What has been ingested</h2>
@@ -123,6 +142,7 @@ export default function App() {
           <div className="tiles">
             <Tile k="Athlete-seasons" v={data.athleteSeasons.length} d="parsed rows" />
             <Tile k="Distinct athletes" v={uniqueAthletes} d="by source ID" />
+            <Tile k="With a detail page" v={uniqueAthletes} d="click any name" />
             <Tile k="Sports" v={sports.length} d="of 23 available" />
             <Tile k="Seasons" v={seasons.length} d={seasons.join(", ")} />
             <Tile k="Parse warnings" v={0} d="across all pages" />
@@ -174,17 +194,9 @@ export default function App() {
                   <tr key={`${a.id}-${a.season}`}>
                     <td className="num">{a.jersey ?? "—"}</td>
                     <td className="nm">
-                      {a.bioUrl ? (
-                        <a
-                          href={`https://haverfordathletics.com${a.bioUrl}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {a.name}
-                        </a>
-                      ) : (
-                        a.name
-                      )}
+                      <button className="link-btn" onClick={() => setSelected(a.id)}>
+                        {a.name}
+                      </button>
                     </td>
                     <td className="muted">{a.sport}</td>
                     <td className="num">{a.season === "current" ? "Current" : a.season}</td>
@@ -270,6 +282,8 @@ export default function App() {
             </table>
           </div>
         </section>
+        </>
+        )}
       </div>
 
       <footer>

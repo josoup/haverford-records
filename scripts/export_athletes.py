@@ -50,6 +50,7 @@ def main() -> int:
                 "state": m.group(1) if m else None,
                 "highSchool": r.highschool,
                 "bioUrl": r.bio_url,
+                "headshotUrl": r.headshot_url,
             })
         sources.append({"file": f.name, "athletes": len(page.rows),
                         "sport": slug, "season": season})
