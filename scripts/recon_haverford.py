@@ -156,6 +156,40 @@ def detect_platform(html: str, generator: str) -> list[str]:
     return hits or ["UNKNOWN -- inspect the saved homepage fixture by hand"]
 
 
+class Tee:
+    """Everything printed also lands in run.log, so nothing is lost to scrollback."""
+
+    def __init__(self, stream, path: Path) -> None:
+        self.stream = stream
+        self.fh = path.open("w", encoding="utf-8")
+
+    def write(self, data: str) -> int:
+        self.stream.write(data)
+        self.fh.write(data)
+        self.fh.flush()
+        return len(data)
+
+    def flush(self) -> None:
+        self.stream.flush()
+        self.fh.flush()
+
+
+def _flush(out: Path, report: dict, f: "Fetcher") -> None:
+    (out / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    (out / "fetch_log.json").write_text(json.dumps(f.log, indent=2), encoding="utf-8")
+
+
+def banner() -> None:
+    print("=" * 68)
+    print("  haverford-records site recon  v0.2")
+    print(f"  python     : {sys.version.split()[0]}  ({sys.executable})")
+    print(f"  platform   : {sys.platform}")
+    print("=" * 68)
+    if sys.version_info < (3, 9):
+        print("  !! Needs Python 3.9+. Try python3.11 or python3.12 explicitly.")
+        raise SystemExit(2)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="./recon", type=Path)
@@ -166,6 +200,11 @@ def main() -> int:
     args = ap.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
+    log_path = args.out / "run.log"
+    tee = Tee(sys.__stdout__, log_path)
+    sys.stdout = tee
+    sys.stderr = tee          # the !! failure lines matter most; capture them too
+    banner()
     f = Fetcher(args.out, args.delay)
     report: dict = {"base": BASE}
 
@@ -266,9 +305,36 @@ def main() -> int:
                 print(f"    -> {len(years)} seasons, {min(years)}..{max(years)}")
         report["archive"] = {t: yrs for t, yrs in found.items() if yrs}
 
+    # ---- 5. JSON / API discovery -----------------------------------------
+    # Worth doing FIRST on every new site. Modern athletics platforms render
+    # from JSON their own frontend fetches; if that endpoint is reachable,
+    # scraping the HTML is doing it the hard way. A JSON feed is stable,
+    # structured, and survives redesigns that shatter CSS selectors.
+    print("\n=== 5. JSON / API surface ===")
+    api_hints: set[str] = set()
+    for pat in (
+        r'["\'](/[A-Za-z0-9_/.-]*api[A-Za-z0-9_/.-]*)["\']',
+        r'["\'](/[A-Za-z0-9_/.-]+\.json[A-Za-z0-9_?=&.-]*)["\']',
+        r'["\'](https?://[A-Za-z0-9._-]+/[A-Za-z0-9_/.-]*api[A-Za-z0-9_/.-]*)["\']',
+    ):
+        api_hints.update(m.group(1) for m in re.finditer(pat, home))
+
+    if 'application/ld+json' in home:
+        print("  page embeds JSON-LD structured data (grep the homepage fixture)")
+    if api_hints:
+        for h in sorted(api_hints)[:20]:
+            print(f"    HINT  {h}")
+    else:
+        print("  no inline API hints in the homepage markup")
+
+    for probe in ("/api", "/api/v2", "/services/adaptive_components.ashx", "/sitemap.xml"):
+        st, body = f.get(f"{BASE}{probe}", save=False)
+        marker = "JSON" if body.strip()[:1] in "{[" else ("XML" if body.strip()[:1] == "<" else "")
+        print(f"    probe {probe:45s} -> {st} {marker}")
+    report["api_hints"] = sorted(api_hints)
+
     # ---- wrap up --------------------------------------------------------
-    (args.out / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-    (args.out / "fetch_log.json").write_text(json.dumps(f.log, indent=2), encoding="utf-8")
+    _flush(args.out, report, f)
     n = len(list((args.out / "fixtures").glob("*.html")))
     print(f"\nDone. {n} HTML fixtures in {args.out / 'fixtures'}")
     print(f"Report: {args.out / 'report.json'}")
@@ -277,4 +343,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        print("\ninterrupted -- partial results kept in the out directory")
+        raise SystemExit(130)
