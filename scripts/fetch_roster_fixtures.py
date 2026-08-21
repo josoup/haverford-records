@@ -128,10 +128,8 @@ def main() -> int:
             continue
         if st == 200 and ok:
             found.append(year)
-            # Keep a spread of seasons, not all of them.
-            if year in (2026, 2020, 2015, 2010, 2005, 2000):
-                (args.out / f"roster-{ARCHIVE_PROBE_SPORT}-{year}.html").write_text(
-                    body, encoding="utf-8")
+            (args.out / f"roster-{ARCHIVE_PROBE_SPORT}-{year}.html").write_text(
+                body, encoding="utf-8")
             print(f"  OK  {year}  ~{hits} player refs")
         else:
             print(f"  --  {year}  status {st}")
@@ -139,7 +137,11 @@ def main() -> int:
     if fallbacks:
         print(f"\n  {len(fallbacks)} year(s) served the current roster verbatim: "
               f"{min(fallbacks)}-{max(fallbacks)}")
-    if found:
+    if found and min(found) == args.earliest:
+        print(f"\n  {len(found)} genuine seasons found, oldest probed = {args.earliest}.")
+        print(f"  The floor is at or BELOW {args.earliest} -- re-run with a lower "
+              f"--earliest to find it.")
+    elif found:
         print(f"\n  real archive floor: {min(found)}  ({len(found)} genuine seasons)")
     else:
         print("\n  !! no archived seasons found -- the year URL pattern may differ")
