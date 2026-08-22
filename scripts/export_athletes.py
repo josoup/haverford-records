@@ -13,12 +13,39 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from haverford_records.sources.haverford_site import parse_roster  # noqa: E402
 
-FIXTURES = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
-SPORT_LABEL = {
-    "mens-soccer": "Men's Soccer",
-    "mens-track-and-field": "Men's Track & Field",
-    "wten": "Women's Tennis",
-}
+ROOT = Path(__file__).resolve().parents[1]
+FIXTURES = ROOT / "tests" / "fixtures"
+RAW = ROOT / "data" / "raw"
+def label(slug: str) -> str:
+    if slug == "wten":
+        return "Women's Tennis"
+    s = slug.replace("mens-", "Men's ").replace("womens-", "Women's ")
+    s = s.replace("-", " ").replace("and", "&")
+    return " ".join(w if w.startswith(("Men", "Women")) or w == "&" else w.capitalize()
+                    for w in s.split())
+
+
+def discover() -> list[tuple[Path, str, str]]:
+    """Prefer the full crawl in data/raw/; fall back to the checked-in fixtures.
+
+    The crawler writes data/raw/<sport>/<season>.html, so a completed crawl is
+    the real corpus. tests/fixtures/ only ever held a handful of pages for
+    parser development.
+    """
+    out: list[tuple[Path, str, str]] = []
+    if RAW.is_dir():
+        for f in sorted(RAW.glob("*/*.html")):
+            if f.parent.name == "bios":
+                continue
+            out.append((f, f.parent.name, f.stem))
+    if out:
+        print(f"source: data/raw/  ({len(out)} roster pages from the crawl)")
+        return out
+    for f in sorted(FIXTURES.glob("roster-*.html")):
+        slug, _, season = f.stem.replace("roster-", "").rpartition("-")
+        out.append((f, slug, season))
+    print(f"source: tests/fixtures/  ({len(out)} pages -- run crawl_all.py for the full set)")
+    return out
 # "Timonium, Md." -> "Md."  Hometowns are inconsistent, so only take a state
 # when the shape is unambiguous; otherwise leave it null rather than guess.
 STATE = re.compile(r",\s*([A-Z][A-Za-z.]{1,14})$")
@@ -26,9 +53,7 @@ STATE = re.compile(r",\s*([A-Z][A-Za-z.]{1,14})$")
 
 def main() -> int:
     out, sources = [], []
-    for f in sorted(FIXTURES.glob("roster-*.html")):
-        stem = f.stem.replace("roster-", "")
-        slug, _, season = stem.rpartition("-")
+    for f, slug, season in discover():
         try:
             page = parse_roster(f.read_text(encoding="utf-8"))
         except Exception as e:
@@ -39,7 +64,7 @@ def main() -> int:
             out.append({
                 "id": r.source_athlete_id,
                 "name": r.name,
-                "sport": SPORT_LABEL.get(r.sport_slug, r.sport_slug),
+                "sport": label(r.sport_slug),
                 "sportSlug": r.sport_slug,
                 "season": season,
                 "jersey": r.jersey,
@@ -52,9 +77,9 @@ def main() -> int:
                 "bioUrl": r.bio_url,
                 "headshotUrl": r.headshot_url,
             })
-        sources.append({"file": f.name, "athletes": len(page.rows),
+        sources.append({"file": f"{slug}/{season}", "athletes": len(page.rows),
                         "sport": slug, "season": season})
-        print(f"  {f.name:44s} {len(page.rows):>3} athletes")
+        print(f"  {slug + '/' + season:44s} {len(page.rows):>3} athletes")
 
     payload = {
         "generatedFrom": "haverfordathletics.com roster pages (Sidearm Sports)",

@@ -1764,19 +1764,19 @@
  ],
  "sources": [
   {
-   "file": "roster-mens-soccer-2015.html",
+   "file": "mens-soccer/2015",
    "athletes": 29,
    "sport": "mens-soccer",
    "season": "2015"
   },
   {
-   "file": "roster-mens-soccer-current.html",
+   "file": "mens-soccer/current",
    "athletes": 33,
    "sport": "mens-soccer",
    "season": "current"
   },
   {
-   "file": "roster-mens-track-and-field-current.html",
+   "file": "mens-track-and-field/current",
    "athletes": 48,
    "sport": "mens-track-and-field",
    "season": "current"
